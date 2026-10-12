@@ -166,7 +166,6 @@ class SaxPrinter final : public SaxParser
 	static constexpr auto BOOK_TITLE         = u"FictionBook/description/title-info/book-title";
 	static constexpr auto SEQUENCE           = u"FictionBook/description/title-info/sequence";
 
-
 public:
 	SaxPrinter(QIODevice& input, QIODevice& output, Covers covers, std::unique_ptr<const ExtractedBook> metadataReplacement, const ImageProcessing imageProcessing, QString encoding)
 		: SaxParser { input }

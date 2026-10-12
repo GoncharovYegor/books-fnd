@@ -41,6 +41,7 @@ private:
 	{
 		(record.getSeverity() < plog::Severity::warning ? m_cerr : m_cout) << Formatter::format(record);
 	}
+
 private:
 #if PLOG_CHAR_IS_UTF8
 	std::ostream& m_cout = std::cout;

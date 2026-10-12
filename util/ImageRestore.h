@@ -21,7 +21,8 @@ class Zip;
 
 namespace HomeCompa::Util {
 
-UTIL_EXPORT QByteArray PrepareToExport(QIODevice& input, const QString& folder, const QString& fileName, const ISettings& settings, QString encoding, std::unique_ptr<const ExtractedBook> metadataReplacement = {});
+UTIL_EXPORT QByteArray
+PrepareToExport(QIODevice& input, const QString& folder, const QString& fileName, const ISettings& settings, QString encoding, std::unique_ptr<const ExtractedBook> metadataReplacement = {});
 
 using ExtractBookImagesCallback = std::function<bool(QString /*name*/, bool /*isCover*/, QByteArray /*body*/)>;
 UTIL_EXPORT void ExtractBookImages(const QString& folder, const QString& fileName, const ISettings& settings, const ExtractBookImagesCallback& callback);
