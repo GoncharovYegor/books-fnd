@@ -61,7 +61,7 @@ private:
 class XmlStack
 {
 public:
-	void Push(const QStringView tag) //-V801
+	void Push(const QStringView tag)
 	{
 		const auto lastSize = m_stack.back();
 		m_stack.push_back(lastSize + tag.size() + 1);
@@ -77,7 +77,7 @@ public:
 		}
 	}
 
-	void Pop([[maybe_unused]] const QStringView tag) //-V801
+	void Pop([[maybe_unused]] const QStringView tag)
 	{
 		[[maybe_unused]] const auto to = m_stack.back();
 		m_stack.pop_back();

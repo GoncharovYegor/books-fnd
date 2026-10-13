@@ -60,7 +60,7 @@ std::streambuf::pos_type QStdStreamBuf::seekoff(std::streambuf::off_type off, co
 	return result;
 }
 
-std::streambuf::pos_type QStdStreamBuf::seekpos(const std::streambuf::pos_type off, std::ios_base::openmode /*__mode*/) //-V801
+std::streambuf::pos_type QStdStreamBuf::seekpos(const std::streambuf::pos_type off, std::ios_base::openmode /*__mode*/)
 {
 	return std::streambuf::pos_type(m_dev.seek(off) ? m_dev.pos() : std::streambuf::off_type(-1));
 }
