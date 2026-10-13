@@ -1,5 +1,6 @@
 #pragma once
 
+#include "fnd/EnumBitmask.h"
 #include "fnd/NonCopyMovable.h"
 #include "fnd/memory.h"
 
@@ -17,6 +18,14 @@ class UTILGUI_EXPORT GeometryRestorable
 	NON_COPY_MOVABLE(GeometryRestorable)
 
 public:
+	enum class FontComponent
+	{
+		None   = 0,
+		Family = 1 << 0,
+		Size   = 1 << 1,
+		All    = Family | Size
+	};
+
 	class IObserver // NOLINT(cppcoreguidelines-special-member-functions)
 	{
 	public:
@@ -35,6 +44,7 @@ protected:
 protected:
 	void LoadGeometry();
 	void SaveGeometry();
+	void SetFixedFont(QWidget* widget, FontComponent fontComponent);
 
 private:
 	class Impl;
@@ -57,3 +67,5 @@ UTILGUI_EXPORT void     MoveToParentCenter(QWidget& widget);
 UTILGUI_EXPORT QScreen* GetActiveScreen(QWidget& widget);
 
 } // namespace HomeCompa::Util
+
+ENABLE_BITMASK_OPERATORS(HomeCompa::Util::GeometryRestorable::FontComponent);

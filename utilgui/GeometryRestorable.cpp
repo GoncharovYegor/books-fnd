@@ -140,6 +140,11 @@ public:
 			m_observer.GetWidget().setWindowState(static_cast<Qt::WindowState>(value & ~Qt::WindowMinimized));
 	}
 
+	void SetFixedFont(QWidget* widget, const FontComponent fontComponent)
+	{
+		m_fontFixed[widget] = fontComponent;
+	}
+
 private: // QObject
 	bool eventFilter(QObject* target, QEvent* event) override
 	{
@@ -169,9 +174,13 @@ private:
 
 		for (auto& [widget, pointSize] : CollectWidgets())
 		{
-			auto f = widget->font();
-			f.setPointSizeF(pointSize * sizeFactor);
-			f.setFamily(font.family());
+			const auto it             = m_fontFixed.find(widget);
+			const auto fixedComponent = it != m_fontFixed.end() ? it->second : FontComponent::None;
+			auto       f              = widget->font();
+			if (!(fixedComponent & FontComponent::Size))
+				f.setPointSizeF(pointSize * sizeFactor);
+			if (!(fixedComponent & FontComponent::Family))
+				f.setFamily(font.family());
 			widget->setFont(f);
 		}
 
@@ -200,6 +209,7 @@ private:
 	const QString                                 m_name;
 	bool                                          m_initialized { false };
 	std::vector<std::pair<QWidget*, qreal>>       m_widgets;
+	std::unordered_map<QWidget*, FontComponent>   m_fontFixed;
 
 	PropagateConstPtr<QTimer> m_fontTimer { CreateUiTimer([&] {
 		OnFontChanged();
@@ -221,6 +231,11 @@ void GeometryRestorable::LoadGeometry()
 void GeometryRestorable::SaveGeometry()
 {
 	m_impl->OnHide();
+}
+
+void GeometryRestorable::SetFixedFont(QWidget* widget, const FontComponent fontComponent)
+{
+	m_impl->SetFixedFont(widget, fontComponent);
 }
 
 GeometryRestorableObserver::GeometryRestorableObserver(QWidget& widget)
