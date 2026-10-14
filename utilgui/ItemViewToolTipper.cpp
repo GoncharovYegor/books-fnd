@@ -40,10 +40,11 @@ bool ItemViewToolTipper::eventFilter(QObject* obj, QEvent* event)
 
 	if (!authorAnnotationMode && !m_showForceColumns.contains(index.column()))
 	{
-		const int itemTextWidth = QFontMetrics(view->font()).horizontalAdvance(itemText);
+		const QFontMetrics fontMetrics(view->font());
+		const int          itemTextWidth = fontMetrics.horizontalAdvance(itemText) + fontMetrics.horizontalAdvance('x');
 
 		const auto rect      = view->visualRect(index);
-		auto       rectWidth = rect.width() - 6;
+		auto       rectWidth = rect.width();
 
 		if (index.flags() & Qt::ItemIsUserCheckable)
 			rectWidth -= rect.height();
