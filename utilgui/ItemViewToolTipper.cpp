@@ -4,6 +4,8 @@
 #include <QHelpEvent>
 #include <QToolTip>
 
+#include "fnd/ScopedCall.h"
+
 #include "Constant.h"
 
 using namespace HomeCompa::Util;
@@ -36,15 +38,12 @@ bool ItemViewToolTipper::eventFilter(QObject* obj, QEvent* event)
 	const auto itemText             = index.data().toString();
 	const auto authorAnnotationMode = itemText == Global::INFO;
 
-	auto font = view->font();
-	font.setPointSizeF(font.pointSizeF() * (authorAnnotationMode ? 0.8 : 1.2));
-
 	if (!authorAnnotationMode && !m_showForceColumns.contains(index.column()))
 	{
-		const int itemTextWidth = QFontMetrics(font).horizontalAdvance(itemText);
+		const int itemTextWidth = QFontMetrics(view->font()).horizontalAdvance(itemText);
 
 		const auto rect      = view->visualRect(index);
-		auto       rectWidth = rect.width();
+		auto       rectWidth = rect.width() - 6;
 
 		if (index.flags() & Qt::ItemIsUserCheckable)
 			rectWidth -= rect.height();
@@ -53,7 +52,16 @@ bool ItemViewToolTipper::eventFilter(QObject* obj, QEvent* event)
 			return true;
 	}
 
-	QToolTip::setFont(font);
+	const ScopedCall fontGuard(
+		[&] {
+			auto newFont = view->font();
+			newFont.setPointSizeF(newFont.pointSizeF() * (authorAnnotationMode ? 0.8 : 1.1));
+			QToolTip::setFont(newFont);
+		},
+		[oldFont = QToolTip::font()] {
+			QToolTip::setFont(oldFont);
+		}
+	);
 	QToolTip::showText(helpEvent->globalPos(), itemTooltip, view);
 
 	return true;
