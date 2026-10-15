@@ -22,11 +22,15 @@ R Try(const S& name, const T& functor, const std::string_view file, const int li
 	}
 	catch (const std::exception& ex)
 	{
-		PLOGE << std::format("{} failed. {}, {}: {}", name, file, line, ex.what());
+		std::filesystem::path thisPath(__FILE__);
+		thisPath = thisPath.parent_path().parent_path().parent_path().parent_path();
+		PLOGE << std::format("{} failed. src{}, {}: {}", name, file.substr(thisPath.string().length()), line, ex.what());
 	}
 	catch (...)
 	{
-		PLOGE << std::format("{}, {}: unknown error", file, line);
+		std::filesystem::path thisPath(__FILE__);
+		thisPath = thisPath.parent_path().parent_path().parent_path().parent_path();
+		PLOGE << std::format("{} failed. src{}, {}: unknown error", name, file.substr(thisPath.string().length()), line);
 	}
 
 	return R {};
