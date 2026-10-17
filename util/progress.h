@@ -15,6 +15,7 @@ class UTIL_EXPORT Progress
 	NON_COPY_MOVABLE(Progress)
 
 public:
+	Progress(std::string name);
 	Progress(size_t total, std::string name);
 	~Progress();
 	void   Increment(size_t value, const std::string& comment = {});

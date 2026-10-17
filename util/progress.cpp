@@ -29,12 +29,17 @@ std::string DurationToString(long long milliseconds)
 	return std::format("{}h {:02}m {:02}s", hours, minutes, seconds);
 }
 
+Progress::Progress(std::string name)
+	: Progress(0, std::move(name))
+{
+}
+
 Progress::Progress(const size_t total, std::string name)
 	: m_startedAt { std::chrono::system_clock::now() }
 	, m_total { total }
 	, m_name { std::move(name) }
 {
-	PLOGI << m_name << " started, total: " << m_total;
+	PLOGI << std::format("{} started{}", m_name, m_total ? std::format(", total: {}", m_total) : std::string {});
 }
 
 Progress::~Progress()
