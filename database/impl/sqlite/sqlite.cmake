@@ -7,6 +7,7 @@ AddTarget(dbsqlite	shared_lib
 		"${CMAKE_CURRENT_LIST_DIR}/../../../../sqlite/sqlite"
 		"${CMAKE_CURRENT_LIST_DIR}/../../interface"
 	LINK_LIBRARIES
+		Boost::headers
 		plog::plog
 		Qt${QT_MAJOR_VERSION}::Core
 	LINK_TARGETS

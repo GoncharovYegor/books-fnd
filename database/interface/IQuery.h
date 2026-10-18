@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include <boost/iterator/iterator_facade.hpp>
+
 #include "ICommand.h"
 
 namespace HomeCompa::DB {
@@ -12,6 +14,44 @@ T GetImpl(const IQuery& query, size_t index) = delete;
 
 class IQuery : public ICommand
 {
+public:
+	class Iterator : public boost::iterator_facade<Iterator, IQuery, boost::forward_traversal_tag>
+	{
+	public:
+		explicit Iterator(IQuery* query = nullptr)
+			: m_query { query }
+		{
+			if (!m_query)
+				return;
+
+			m_query->Execute();
+			m_id = 0;
+		}
+
+	private:
+		friend class boost::iterator_core_access;
+
+		IQuery& dereference() const
+		{
+			return *m_query;
+		}
+
+		bool equal(const Iterator& other) const
+		{
+			return m_id == other.m_id;
+		}
+
+		void increment()
+		{
+			m_query->Next();
+			m_query->Eof() ? m_id = -1 : ++m_id;
+		}
+
+	private:
+		IQuery*   m_query;
+		long long m_id { -1 };
+	};
+
 public:
 	virtual bool Eof()   = 0;
 	virtual void Next()  = 0;
@@ -32,6 +72,16 @@ public:
 	T Get(const size_t index) const
 	{
 		return GetImpl<T>(*this, index);
+	}
+
+	Iterator begin()
+	{
+		return Iterator { this };
+	}
+
+	Iterator end()
+	{
+		return Iterator {};
 	}
 };
 
