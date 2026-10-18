@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cassert>
+
 namespace HomeCompa {
 
 template <typename X, typename Y>
