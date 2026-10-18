@@ -1,10 +1,16 @@
 #include "progress.h"
 
 #include "fnd/ScopedCall.h"
+#include "fnd/linear.h"
 
 #include "log.h"
 
 using namespace HomeCompa::Util;
+
+int64_t Now() noexcept
+{
+	return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+}
 
 std::string DurationToString(long long milliseconds)
 {
@@ -34,35 +40,42 @@ Progress::Progress(std::string name)
 {
 }
 
-Progress::Progress(const size_t total, std::string name)
-	: m_startedAt { std::chrono::system_clock::now() }
+Progress::Progress(const int64_t total, std::string name)
+	: m_startedAt {
+		Now()
+}
 	, m_total { total }
 	, m_name { std::move(name) }
+	, m_state { { m_startedAt, 0 } }
 {
 	PLOGI << std::format("{} started{}", m_name, m_total ? std::format(", total: {}", m_total) : std::string {});
 }
 
 Progress::~Progress()
 {
-	PLOGI << m_name << " completed in " << DurationToString(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - m_startedAt).count());
+	PLOGI << m_name << " completed in " << DurationToString(Now() - m_startedAt);
 }
 
-void Progress::Increment(const size_t value, const std::string& comment)
+void Progress::Increment(const int64_t value, const std::string& comment)
 {
-	const size_t     count      = (m_count += value);
+	const int64_t    count      = (m_count += value);
 	const auto       currentPct = static_cast<int>(count * 100 / m_total);
 	const ScopedCall guard([&] {
 		m_currentPct = currentPct;
 	});
 
-	const auto now  = std::chrono::system_clock::now();
-	const auto left = count >= m_total ? std::string { "done" } : DurationToString(std::chrono::duration_cast<std::chrono::milliseconds>(m_startedAt + (now - m_startedAt) / count * m_total - now).count());
+	const auto now                   = Now();
+	const auto [lastTime, lastCount] = m_state.load();
+	const Linear l(0LL, lastTime, count - lastCount, now);
+	const auto   left = count >= m_total ? std::string { "done" } : DurationToString(l(m_total) - now);
 
 	if (comment.empty())
 	{
 		if (m_currentPct != currentPct)
 		{
 			PLOGV << std::format("{}, {} ({}) {}% - {}", m_name, count, m_total, currentPct, left);
+			if (count >= lastCount + 10)
+				m_state = { now, count };
 		}
 		return;
 	}
@@ -70,7 +83,7 @@ void Progress::Increment(const size_t value, const std::string& comment)
 	PLOGV << std::format("{}, {} ({}) {}% - {}", comment, count, m_total, currentPct, left);
 }
 
-size_t Progress::GetCount() const noexcept
+int64_t Progress::GetCount() const noexcept
 {
 	return m_count;
 }
