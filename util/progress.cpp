@@ -1,11 +1,16 @@
 #include "progress.h"
 
+#include <atomic>
+#include <chrono>
+
 #include "fnd/ScopedCall.h"
 #include "fnd/linear.h"
 
 #include "log.h"
 
 using namespace HomeCompa::Util;
+
+namespace{
 
 int64_t Now() noexcept
 {
@@ -35,55 +40,66 @@ std::string DurationToString(long long milliseconds)
 	return std::format("{}h {:02}m {:02}s", hours, minutes, seconds);
 }
 
+}
+
+struct Progress::Impl
+{
+    const std::string name;
+    const int64_t     total;
+    const int64_t     startedAt {Now() };
+
+    std::atomic<int>     currentPct { 0 };
+    std::atomic<int64_t> count { 0 };
+    std::atomic<State>   state { { startedAt, 0 } };
+
+};
+
 Progress::Progress(std::string name)
 	: Progress(0, std::move(name))
 {
 }
 
 Progress::Progress(const int64_t total, std::string name)
-	: m_startedAt {
-		Now()
-}
-	, m_total { total }
-	, m_name { std::move(name) }
-	, m_state { { m_startedAt, 0 } }
+    : m_impl{std::move(name), total}
 {
-	PLOGI << std::format("{} started{}", m_name, m_total ? std::format(", total: {}", m_total) : std::string {});
+    PLOGI << std::format("{} started{}", name, total ? std::format(", total: {}", total) : std::string {});
 }
 
 Progress::~Progress()
 {
-	PLOGI << m_name << " completed in " << DurationToString(Now() - m_startedAt);
+    auto& impl = *m_impl;
+    PLOGI << impl.name << " completed in " << DurationToString(Now() - impl.startedAt);
 }
 
 void Progress::Increment(const int64_t value, const std::string& comment)
 {
-	const int64_t    count      = (m_count += value);
-	const auto       currentPct = static_cast<int>(count * 100 / m_total);
+    auto& impl = *m_impl;
+    const int64_t    count      = (impl.count += value);
+    const auto       currentPct = static_cast<int>(count * 100 / impl.total);
 	const ScopedCall guard([&] {
-		m_currentPct = currentPct;
+        impl.currentPct = currentPct;
 	});
 
 	const auto now                   = Now();
-	const auto [lastTime, lastCount] = m_state.load();
+    const auto [lastTime, lastCount] = impl.state.load();
 	const Linear<int64_t, int64_t> l(0, lastTime, count - lastCount, now);
-	const auto   left = count >= m_total ? std::string { "done" } : DurationToString(l(m_total) - now);
+    const auto   left = count >= impl.total ? std::string { "done" } : DurationToString(l(impl.total) - now);
 
 	if (comment.empty())
 	{
-		if (m_currentPct != currentPct)
+        if (impl.currentPct != currentPct)
 		{
-			PLOGV << std::format("{}, {} ({}) {}% - {}", m_name, count, m_total, currentPct, left);
+            PLOGV << std::format("{}, {} ({}) {}% - {}", impl.name, count, impl.total, currentPct, left);
 			if (count >= lastCount + 10)
-				m_state = { now, count };
+                impl.state = { now, count };
 		}
 		return;
 	}
 
-	PLOGV << std::format("{}, {} ({}) {}% - {}", comment, count, m_total, currentPct, left);
+    PLOGV << std::format("{}, {} ({}) {}% - {}", comment, count, impl.total, currentPct, left);
 }
 
 int64_t Progress::GetCount() const noexcept
 {
-	return m_count;
+    return m_impl->count;
 }

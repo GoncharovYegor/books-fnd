@@ -11,7 +11,7 @@ AddTarget(util	shared_lib
 		Qt${QT_MAJOR_VERSION}::Gui
 		XercesC::XercesC
 		cimg::cimg
-		[ GNU atomic ]
+		[ GCC atomic ]
 	LINK_TARGETS
 		fljxl
 		logging

@@ -1,9 +1,8 @@
 #pragma once
 
-#include <atomic>
-#include <chrono>
 #include <string>
 
+#include "fnd/memory.h"
 #include "fnd/NonCopyMovable.h"
 
 #include "export/util.h"
@@ -28,13 +27,8 @@ public:
 	int64_t GetCount() const noexcept;
 
 private:
-	const int64_t     m_startedAt;
-	const int64_t     m_total;
-	const std::string m_name;
-
-	std::atomic<int>     m_currentPct { 0 };
-	std::atomic<int64_t> m_count { 0 };
-	std::atomic<State>   m_state;
+    struct Impl;
+    PropagateConstPtr<Impl> m_impl;
 };
 
 } // namespace HomeCompa::Util
