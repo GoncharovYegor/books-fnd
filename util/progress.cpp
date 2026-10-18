@@ -66,7 +66,7 @@ void Progress::Increment(const int64_t value, const std::string& comment)
 
 	const auto now                   = Now();
 	const auto [lastTime, lastCount] = m_state.load();
-	const Linear l(0LL, lastTime, count - lastCount, now);
+	const Linear<int64_t, int64_t> l(0, lastTime, count - lastCount, now);
 	const auto   left = count >= m_total ? std::string { "done" } : DurationToString(l(m_total) - now);
 
 	if (comment.empty())
