@@ -50,10 +50,16 @@ bool RunProcess(const QString& command, const QString& parameters, const QString
 		eventLoop.exit(code);
 	});
 	QObject::connect(&process, &QProcess::readyReadStandardError, [&] {
-		PLOGE << process.readAllStandardError();
+		auto message = process.readAllStandardError();
+		while (message.endsWith('\n'))
+			message.chop(1);
+		PLOGE << message;
 	});
 	QObject::connect(&process, &QProcess::readyReadStandardOutput, [&] {
-		PLOGV << process.readAllStandardOutput();
+		auto message = process.readAllStandardOutput();
+		while (message.endsWith('\n'))
+			message.chop(1);
+		PLOGV << message;
 	});
 
 	process.start(QDir::toNativeSeparators(command), args, QIODevice::ReadWrite);
