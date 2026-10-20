@@ -13,9 +13,7 @@ namespace HomeCompa::Util {
 BookHashItem ParseDbHash(DB::IDatabase& db, const QString& folder, const QString& file)
 {
 	const auto fileId = [&] {
-		const auto query = db.CreateQuery("select f.FileId from File f join Folder d on d.FolderId = f.FolderId and d.Name = ? where f.Name = ?");
-		query->Bind(0, folder);
-		query->Bind(1, file);
+		const auto query = db.CreateQuery("select f.FileId from File f join Folder d on d.FolderId = f.FolderId and d.Name = ? where f.Name = ?", folder, file);
 		query->Execute();
 		return query->Eof() ? -1LL : query->Get<long long>(0);
 	}();

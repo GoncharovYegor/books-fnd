@@ -1,5 +1,8 @@
 #pragma once
 
+#include <format>
+#include <stdexcept>
+
 #include <QString>
 
 namespace HomeCompa::DB {
@@ -11,11 +14,50 @@ template <typename T>
 int BindImpl(ICommand& command, std::string_view name, T value) = delete;
 template <typename T>
 concept IsString = std::is_same_v<T, const std::string&> || std::is_same_v<T, std::string> || std::is_same_v<T, const char*> || std::is_same_v<T, QStringView> || std::is_same_v<T, QString>;
+
 template <typename T>
-concept NotString = !IsString<T>;
+struct is_optional : std::false_type
+{
+};
+
+template <typename T>
+struct is_optional<std::optional<T>> : std::true_type
+{
+};
+
+template <typename T>
+concept IsOptional = is_optional<T>::value;
+template <typename T>
+concept NotString = !IsString<T> && !IsOptional<T>;
 
 class ICommand // NOLINT(cppcoreguidelines-special-member-functions)
 {
+public:
+	class BindStream
+	{
+	public:
+		BindStream(ICommand& cmd, const size_t idx)
+			: m_cmd { cmd }
+			, m_idx { idx }
+		{
+		}
+
+		template <typename T>
+		BindStream& operator<<(T value)
+		{
+			auto rc = m_cmd.Bind(m_idx, value);
+			if (rc != 0)
+				throw std::runtime_error(std::format("cannot bind with index {}", m_idx));
+
+			++m_idx;
+			return *this;
+		}
+
+	private:
+		ICommand& m_cmd;
+		size_t    m_idx;
+	};
+
 public:
 	virtual ~ICommand() = default;
 
@@ -27,6 +69,46 @@ public:
 	virtual int BindLong(size_t index, long long int value)      = 0;
 	virtual int BindDouble(size_t index, double value)           = 0;
 	virtual int BindString(size_t index, std::string_view value) = 0;
+
+	template <typename First, typename Second>
+	bool Execute(const std::pair<First, Second>& value)
+	{
+		return Execute(value.first, value.second);
+	}
+
+	template <typename... ARGS>
+	bool Execute(const ARGS&... args)
+	{
+		auto binder = Binder();
+		((binder << args), ...);
+		return Execute();
+	}
+
+	template <typename... ARGS>
+	bool Execute(const std::tuple<ARGS...>& value)
+	{
+		auto binder = Binder();
+		std::apply(
+			[&](const auto&... x) {
+				((binder << x), ...);
+			},
+			value
+		);
+		return Execute();
+	}
+
+	template <typename T>
+	BindStream operator<<(T value)
+	{
+		BindStream stream(*this, 0);
+		stream << value;
+		return stream;
+	}
+
+	BindStream Binder(const size_t index = 0)
+	{
+		return BindStream { *this, index };
+	}
 
 	int BindString(const size_t index, const QStringView value)
 	{
@@ -44,6 +126,12 @@ public:
 	int Bind(const size_t index, T value)
 	{
 		return BindImpl<T>(*this, index, value);
+	}
+
+	template <IsOptional T>
+	int Bind(const size_t index, T value)
+	{
+		return value ? Bind<typename T::value_type>(index, *value) : Bind(index);
 	}
 
 	virtual int Bind(std::string_view name)                               = 0;
@@ -69,7 +157,19 @@ public:
 	{
 		return BindImpl<T>(*this, name, value);
 	}
+
+	template <IsOptional T>
+	int Bind(const std::string_view name, T value)
+	{
+		return value ? BindImpl<typename T::value_type>(*this, name, *value) : Bind(name);
+	}
 };
+
+template <>
+inline int BindImpl(ICommand& command, const size_t index, std::nullopt_t)
+{
+	return command.Bind(index);
+}
 
 template <>
 inline int BindImpl(ICommand& command, const size_t index, const int value)
@@ -105,6 +205,12 @@ template <>
 inline int BindImpl(ICommand& command, const std::string_view name, const int value)
 {
 	return command.BindInt(name, value);
+}
+
+template <>
+inline int BindImpl(ICommand& command, const std::string_view name, std::nullopt_t)
+{
+	return command.Bind(name);
 }
 
 template <>

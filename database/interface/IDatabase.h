@@ -48,10 +48,20 @@ public:
 	virtual void RegisterObserver(IDatabaseObserver* observer)   = 0;
 	virtual void UnregisterObserver(IDatabaseObserver* observer) = 0;
 
-	[[nodiscard]] std::unique_ptr<IQuery> CreateQuery(const QStringView query)
+	template <typename... ARGS>
+	[[nodiscard]] std::unique_ptr<IQuery> CreateQuery(const QStringView query, const ARGS&... args)
 	{
 		const auto str = query.toUtf8();
-		return CreateQuery(std::string_view { str.data(), static_cast<size_t>(str.size()) });
+		return CreateQuery(std::string_view { str.data(), static_cast<size_t>(str.size()) }, args...);
+	}
+
+	template<typename... ARGS>
+	[[nodiscard]] std::unique_ptr<IQuery> CreateQuery(const std::string_view text, const ARGS&... args)
+	{
+		auto query = CreateQuery(text);
+		auto binder = query->Binder();
+		((binder << args), ...);
+		return query;
 	}
 };
 
