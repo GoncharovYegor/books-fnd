@@ -1,5 +1,8 @@
 #pragma once
 
+#include <format>
+#include <stdexcept>
+
 #include <QString>
 
 namespace HomeCompa::DB {
@@ -17,6 +20,32 @@ concept NotString = !IsString<T>;
 class ICommand // NOLINT(cppcoreguidelines-special-member-functions)
 {
 public:
+	class BindStream
+	{
+	public:
+		BindStream(ICommand& cmd, const size_t idx)
+			: m_cmd { cmd }
+			, m_idx { idx }
+		{
+		}
+
+		template <typename T>
+		BindStream& operator<<(T value)
+		{
+			auto rc = m_cmd.Bind(m_idx, value);
+			if (rc != 0)
+				throw std::runtime_error(std::format("cannot bind with index {}", m_idx));
+
+			++m_idx;
+			return *this;
+		}
+
+	private:
+		ICommand& m_cmd;
+		size_t    m_idx;
+	};
+
+public:
 	virtual ~ICommand() = default;
 
 public:
@@ -27,6 +56,11 @@ public:
 	virtual int BindLong(size_t index, long long int value)      = 0;
 	virtual int BindDouble(size_t index, double value)           = 0;
 	virtual int BindString(size_t index, std::string_view value) = 0;
+
+	BindStream Binder(const size_t index = 0)
+	{
+		return BindStream { *this, index };
+	}
 
 	int BindString(const size_t index, const QStringView value)
 	{
