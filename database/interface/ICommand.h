@@ -70,6 +70,41 @@ public:
 	virtual int BindDouble(size_t index, double value)           = 0;
 	virtual int BindString(size_t index, std::string_view value) = 0;
 
+	template <typename First, typename Second>
+	bool Execute(const std::pair<First, Second>& value)
+	{
+		return Execute(value.first, value.second);
+	}
+
+	template <typename... ARGS>
+	bool Execute(const ARGS&... args)
+	{
+		auto binder = Binder();
+		((binder << args), ...);
+		return Execute();
+	}
+
+	template <typename... ARGS>
+	bool Execute(const std::tuple<ARGS...>& value)
+	{
+		auto binder = Binder();
+		std::apply(
+			[&](const auto&... x) {
+				((binder << x), ...);
+			},
+			value
+		);
+		return Execute();
+	}
+
+	template <typename T>
+	BindStream operator<<(T value)
+	{
+		BindStream stream(*this, 0);
+		stream << value;
+		return stream;
+	}
+
 	BindStream Binder(const size_t index = 0)
 	{
 		return BindStream { *this, index };
@@ -96,7 +131,7 @@ public:
 	template <IsOptional T>
 	int Bind(const size_t index, T value)
 	{
-		return value ? BindImpl<typename T::value_type>(*this, index, *value) : Bind(index);
+		return value ? Bind<typename T::value_type>(index, *value) : Bind(index);
 	}
 
 	virtual int Bind(std::string_view name)                               = 0;
