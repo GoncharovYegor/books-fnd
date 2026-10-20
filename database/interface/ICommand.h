@@ -14,8 +14,21 @@ template <typename T>
 int BindImpl(ICommand& command, std::string_view name, T value) = delete;
 template <typename T>
 concept IsString = std::is_same_v<T, const std::string&> || std::is_same_v<T, std::string> || std::is_same_v<T, const char*> || std::is_same_v<T, QStringView> || std::is_same_v<T, QString>;
+
 template <typename T>
-concept NotString = !IsString<T>;
+struct is_optional : std::false_type
+{
+};
+
+template <typename T>
+struct is_optional<std::optional<T>> : std::true_type
+{
+};
+
+template <typename T>
+concept IsOptional = is_optional<T>::value;
+template <typename T>
+concept NotString = !IsString<T> && !IsOptional<T>;
 
 class ICommand // NOLINT(cppcoreguidelines-special-member-functions)
 {
@@ -80,6 +93,12 @@ public:
 		return BindImpl<T>(*this, index, value);
 	}
 
+	template <IsOptional T>
+	int Bind(const size_t index, T value)
+	{
+		return value ? BindImpl<typename T::value_type>(*this, index, *value) : Bind(index);
+	}
+
 	virtual int Bind(std::string_view name)                               = 0;
 	virtual int BindInt(std::string_view name, int value)                 = 0;
 	virtual int BindLong(std::string_view name, long long int value)      = 0;
@@ -103,7 +122,19 @@ public:
 	{
 		return BindImpl<T>(*this, name, value);
 	}
+
+	template <IsOptional T>
+	int Bind(const std::string_view name, T value)
+	{
+		return value ? BindImpl<typename T::value_type>(*this, name, *value) : Bind(name);
+	}
 };
+
+template <>
+inline int BindImpl(ICommand& command, const size_t index, std::nullopt_t)
+{
+	return command.Bind(index);
+}
 
 template <>
 inline int BindImpl(ICommand& command, const size_t index, const int value)
@@ -139,6 +170,12 @@ template <>
 inline int BindImpl(ICommand& command, const std::string_view name, const int value)
 {
 	return command.BindInt(name, value);
+}
+
+template <>
+inline int BindImpl(ICommand& command, const std::string_view name, std::nullopt_t)
+{
+	return command.Bind(name);
 }
 
 template <>
