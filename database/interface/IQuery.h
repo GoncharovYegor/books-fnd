@@ -25,7 +25,7 @@ public:
 				return;
 
 			m_query->Execute();
-			m_id = 0;
+			m_id = m_query->Eof() ? -1 : 0;
 		}
 
 	private:
