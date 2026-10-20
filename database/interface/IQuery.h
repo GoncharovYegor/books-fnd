@@ -74,6 +74,12 @@ public:
 		return GetImpl<T>(*this, index);
 	}
 
+	template <typename... ARGS>
+	std::tuple<ARGS...> Get() const
+	{
+		return GetTupleImpl<ARGS...>(std::index_sequence_for<ARGS...> {});
+	}
+
 	Iterator begin()
 	{
 		return Iterator { this };
@@ -82,6 +88,13 @@ public:
 	Iterator end()
 	{
 		return Iterator {};
+	}
+
+private:
+	template <typename... ARGS, std::size_t... Is>
+	std::tuple<ARGS...> GetTupleImpl(std::index_sequence<Is...>) const
+	{
+		return std::make_tuple(Get<ARGS>(Is)...);
 	}
 };
 
