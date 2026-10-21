@@ -21,8 +21,7 @@ BookHashItem ParseDbHash(DB::IDatabase& db, const QString& folder, const QString
 		return {};
 
 	auto bookHashItem = [&]() -> BookHashItem {
-		const auto query = db.CreateQuery("select f.Md5, f.Title, f.Hash, f.Annotation, f.WordCount, f.SymbolCount, f.SimHash from File f where f.FileId = ?");
-		query->Bind(0, fileId);
+		const auto query = db.CreateQuery("select f.Md5, f.Title, f.Hash, f.Annotation, f.WordCount, f.SymbolCount, f.SimHash from File f where f.FileId = ?", fileId);
 		query->Execute();
 		if (query->Eof())
 			return {};
@@ -47,10 +46,8 @@ BookHashItem ParseDbHash(DB::IDatabase& db, const QString& folder, const QString
 		return {};
 
 	const auto process = [&](const std::string_view queryText, const auto& f) {
-		const auto query = db.CreateQuery(queryText);
-		query->Bind(0, fileId);
-		for (query->Execute(); !query->Eof(); query->Next())
-			f(*query);
+		const auto query = db.CreateQuery(queryText, fileId);
+		std::ranges::for_each(*query, f);
 	};
 
 	process("select Name, Md5, PHash, EncodedSize, DecodedSize, Width, Height, Linked, HasAlpha from Image where FileId = ? order by ImageId", [&](const DB::IQuery& query) {
