@@ -7,7 +7,6 @@ AddTarget(util	shared_lib
 	INCLUDE_DIRECTORIES
 		"${EXT_ROOT}/libmobi/src"
 	LINK_LIBRARIES
-		Boost::headers
 		Qt${QT_MAJOR_VERSION}::Core
 		Qt${QT_MAJOR_VERSION}::Gui
 		XercesC::XercesC

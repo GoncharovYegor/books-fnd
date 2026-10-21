@@ -2,8 +2,6 @@
 
 #include <string>
 
-#include <boost/iterator/iterator_facade.hpp>
-
 #include "ICommand.h"
 
 namespace HomeCompa::DB {
@@ -15,41 +13,59 @@ T GetImpl(const IQuery& query, size_t index) = delete;
 class IQuery : public ICommand
 {
 public:
-	class Iterator : public boost::iterator_facade<Iterator, IQuery, boost::forward_traversal_tag>
+	class Iterator
 	{
 	public:
-		explicit Iterator(IQuery* query = nullptr)
-			: m_query { query }
-		{
-			if (!m_query)
-				return;
+		using iterator_concept  = std::input_iterator_tag;
+		using iterator_category = std::input_iterator_tag;
+		using value_type        = IQuery;
+		using difference_type   = std::ptrdiff_t;
+		using reference         = IQuery&;
 
-			m_query->Execute();
-			m_id = m_query->Eof() ? -1 : 0;
+		struct Sentinel
+		{
+		};
+
+		Iterator()
+			: m_query(nullptr)
+		{
 		}
 
-	private:
-		friend class boost::iterator_core_access;
+		explicit Iterator(IQuery* query)
+			: m_query(query)
+		{
+			m_query->Execute();
+		}
 
-		IQuery& dereference() const
+		reference operator*() const
 		{
 			return *m_query;
 		}
 
-		bool equal(const Iterator& other) const
+		IQuery* operator->() const
 		{
-			return m_id == other.m_id;
+			return m_query;
 		}
 
-		void increment()
+		Iterator& operator++()
 		{
-			m_query->Next();
-			m_query->Eof() ? m_id = -1 : ++m_id;
+			if (m_query)
+				m_query->Next();
+			return *this;
+		}
+
+		void operator++(int)
+		{
+			++(*this);
+		}
+
+		bool operator==(Sentinel) const
+		{
+			return m_query == nullptr || m_query->Eof();
 		}
 
 	private:
-		IQuery*   m_query;
-		long long m_id { -1 };
+		IQuery* m_query;
 	};
 
 public:
@@ -85,9 +101,9 @@ public:
 		return Iterator { this };
 	}
 
-	Iterator end()
+    Iterator::Sentinel end()
 	{
-		return Iterator {};
+		return Iterator::Sentinel {};
 	}
 
 private:
