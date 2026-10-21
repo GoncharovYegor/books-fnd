@@ -62,7 +62,7 @@ Progress::Progress(std::string name)
 Progress::Progress(const int64_t total, std::string name)
     : m_impl{std::move(name), total}
 {
-    PLOGI << std::format("{} started{}", name, total ? std::format(", total: {}", total) : std::string {});
+	PLOGI << std::format("{} started{}", m_impl->name, total ? std::format(", total: {}", total) : std::string {});
 }
 
 Progress::~Progress()
