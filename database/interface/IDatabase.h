@@ -55,10 +55,10 @@ public:
 		return CreateQuery(std::string_view { str.data(), static_cast<size_t>(str.size()) }, args...);
 	}
 
-	template<typename... ARGS>
+	template <typename... ARGS>
 	[[nodiscard]] std::unique_ptr<IQuery> CreateQuery(const std::string_view text, const ARGS&... args)
 	{
-		auto query = CreateQuery(text);
+		auto query  = CreateQuery(text);
 		auto binder = query->Binder();
 		((binder << args), ...);
 		return query;

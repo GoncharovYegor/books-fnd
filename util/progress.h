@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "fnd/memory.h"
 #include "fnd/NonCopyMovable.h"
+#include "fnd/memory.h"
 
 #include "export/util.h"
 
@@ -27,8 +27,8 @@ public:
 	int64_t GetCount() const noexcept;
 
 private:
-    struct Impl;
-    PropagateConstPtr<Impl> m_impl;
+	struct Impl;
+	PropagateConstPtr<Impl> m_impl;
 };
 
 } // namespace HomeCompa::Util
