@@ -46,8 +46,7 @@ BookHashItem ParseDbHash(DB::IDatabase& db, const QString& folder, const QString
 		return {};
 
 	const auto process = [&](const std::string_view queryText, const auto& f) {
-		const auto query = db.CreateQuery(queryText, fileId);
-		std::ranges::for_each(*query, f);
+		db.CreateQuery(queryText, fileId)->ForEach(f);
 	};
 
 	process("select Name, Md5, PHash, EncodedSize, DecodedSize, Width, Height, Linked, HasAlpha from Image where FileId = ? order by ImageId", [&](const DB::IQuery& query) {

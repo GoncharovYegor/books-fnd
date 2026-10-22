@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ranges>
 #include <string>
 
 #include "ICommand.h"
@@ -90,10 +91,22 @@ public:
 		return GetImpl<T>(*this, index);
 	}
 
+	template <typename First, typename Second>
+	auto Get(const size_t indexFirst, const size_t indexSecond) const
+	{
+		return std::make_pair(Get<First>(indexFirst), Get<Second>(indexSecond));
+	}
+
 	template <typename... ARGS>
 	std::tuple<ARGS...> Get() const
 	{
 		return GetTupleImpl<ARGS...>(std::index_sequence_for<ARGS...> {});
+	}
+
+	template <typename Functor>
+	void ForEach(Functor&& f)
+	{
+		std::ranges::for_each(*this, std::forward<Functor>(f));
 	}
 
 	Iterator begin()
