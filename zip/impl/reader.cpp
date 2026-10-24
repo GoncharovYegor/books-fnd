@@ -9,6 +9,7 @@
 #include "fnd/ScopedCall.h"
 
 #include "bit7z/bitinputarchive.hpp"
+#include "util/executor/ThreadPool.h"
 #include "zip/interface/file.h"
 #include "zip/interface/stream.h"
 
@@ -17,8 +18,6 @@
 #include "log.h"
 
 namespace HomeCompa::ZipDetails::SevenZip {
-
-namespace {
 
 struct BytePacket
 {
@@ -66,7 +65,7 @@ public:
 	{
 		std::lock_guard lock(m_queueGuard);
 		m_isClosed = true;
-		m_condition.notify_all();
+		m_condition.notify_one();
 	}
 
 private:
@@ -75,6 +74,8 @@ private:
 	std::mutex              m_queueGuard;
 	bool                    m_isClosed { false };
 };
+
+namespace {
 
 class QIODeviceStream final : public QIODevice
 {
@@ -107,7 +108,7 @@ private: // QIODevice
 			}
 			else
 			{
-				m_packet = {};
+				m_packet         = {};
 				m_packetPosition = 0;
 			}
 
@@ -134,7 +135,7 @@ private: // QIODevice
 		return m_position;
 	}
 
-	bool seek(const qint64 pos) override
+	bool seek([[maybe_unused]] const qint64 pos) override
 	{
 		assert(pos == m_position);
 		return true;
@@ -149,101 +150,102 @@ private:
 	qint64                    m_packetPosition { 0 };
 };
 
-class QStdStreamBuf final : public std::streambuf
-{
-	NON_COPY_MOVABLE(QStdStreamBuf)
-
-public:
-	explicit QStdStreamBuf(PacketQueue& queue, const size_t bufferSize = size_t { 64 } * 1024u)
-		: m_queue { queue }
-		, m_bufferSize { bufferSize }
-	{
-		setg(nullptr, nullptr, nullptr);
-		AllocateNewBuffer();
-	}
-
-	~QStdStreamBuf() override
-	{
-		sync();
-	}
-
-private: // std::streambuf
-	int_type overflow(const int_type ch) override
-	{
-		FlushBuffer();
-
-		if (!traits_type::eq_int_type(ch, traits_type::eof()))
-		{
-			*pptr() = traits_type::to_char_type(ch);
-			pbump(1);
-		}
-
-		return traits_type::not_eof(ch);
-	}
-
-	int sync() override
-	{
-		FlushBuffer();
-		return 0;
-	}
-
-	pos_type seekoff(off_type off, const std::ios_base::seekdir dir, const std::ios_base::openmode mode) override
-	{
-		FlushBuffer();
-
-		switch (dir)
-		{
-			case std::ios_base::end:
-				off = m_position - off;
-				break;
-			case std::ios_base::cur:
-				off = m_position + off;
-				break;
-			default:
-				break;
-		}
-		return seekpos(off, mode);
-	}
-
-	pos_type seekpos(const pos_type off, std::ios_base::openmode) override
-	{
-		FlushBuffer();
-		return static_cast<pos_type>(m_position >= off ? (m_position = off) : static_cast<ptrdiff_t>(-1));
-	}
-
-private:
-	void AllocateNewBuffer()
-	{
-		m_buffer = { std::make_unique_for_overwrite<char[]>(m_bufferSize), m_bufferSize };
-		setp(m_buffer.storage.get(), m_buffer.storage.get() + m_bufferSize);
-	}
-
-	void FlushBuffer()
-	{
-		const auto pendingBytes = pptr() - pbase();
-		if (pendingBytes == 0)
-			return;
-
-		m_buffer.length = pendingBytes;
-		m_queue.Push(std::move(m_buffer));
-		m_position += pendingBytes;
-
-		AllocateNewBuffer();
-	}
-
-private:
-	PacketQueue& m_queue;
-	const size_t m_bufferSize;
-	BytePacket   m_buffer;
-	ptrdiff_t    m_position { 0 };
-};
-
 class QStdOStream final : public std::ostream
 {
+	class QStdStreamBuf final : public std::streambuf
+	{
+		NON_COPY_MOVABLE(QStdStreamBuf)
+
+	public:
+		explicit QStdStreamBuf(std::weak_ptr<PacketQueue> queue, const size_t bufferSize = size_t { 64 } * 1024u)
+			: m_queue { std::move(queue) }
+			, m_bufferSize { bufferSize }
+		{
+			setg(nullptr, nullptr, nullptr);
+			AllocateNewBuffer();
+		}
+
+		~QStdStreamBuf() override
+		{
+			sync();
+		}
+
+	private: // std::streambuf
+		int_type overflow(const int_type ch) override
+		{
+			FlushBuffer();
+
+			if (!traits_type::eq_int_type(ch, traits_type::eof()))
+			{
+				*pptr() = traits_type::to_char_type(ch);
+				pbump(1);
+			}
+
+			return traits_type::not_eof(ch);
+		}
+
+		int sync() override
+		{
+			FlushBuffer();
+			return 0;
+		}
+
+		pos_type seekoff(off_type off, const seekdir dir, const openmode mode) override
+		{
+			FlushBuffer();
+
+			switch (dir)
+			{
+				case end:
+					off = m_position - off;
+					break;
+				case cur:
+					off = m_position + off;
+					break;
+				default:
+					break;
+			}
+			return seekpos(off, mode);
+		}
+
+		pos_type seekpos(const pos_type off, openmode) override
+		{
+			FlushBuffer();
+			return static_cast<pos_type>(m_position >= off ? (m_position = off) : static_cast<ptrdiff_t>(-1));
+		}
+
+	private:
+		void AllocateNewBuffer()
+		{
+			m_buffer = { std::make_unique_for_overwrite<char[]>(m_bufferSize), m_bufferSize };
+			setp(m_buffer.storage.get(), m_buffer.storage.get() + m_bufferSize);
+		}
+
+		void FlushBuffer()
+		{
+			const auto pendingBytes = pptr() - pbase();
+			if (pendingBytes == 0)
+				return;
+
+			m_buffer.length = pendingBytes;
+			if (const auto queue = m_queue.lock())
+				queue->Push(std::move(m_buffer));
+			m_position += pendingBytes;
+
+			AllocateNewBuffer();
+		}
+
+	private:
+		std::weak_ptr<PacketQueue> m_queue;
+		const size_t               m_bufferSize;
+		BytePacket                 m_buffer;
+		ptrdiff_t                  m_position { 0 };
+	};
+
 public:
-	explicit QStdOStream(PacketQueue& queue)
+	explicit QStdOStream(std::weak_ptr<PacketQueue> queue)
 		: std::ostream(&m_streamBuf)
-		, m_streamBuf { queue }
+		, m_streamBuf { std::move(queue) }
 	{
 	}
 
@@ -254,13 +256,11 @@ private:
 class StreamImpl final : public Stream
 {
 public:
-	StreamImpl(const bit7z::BitInputArchive& zip, const FileItem& fileItem)
-		: m_stream(m_queue, static_cast<int64_t>(fileItem.size))
+	StreamImpl(Context& ctx, const FileItem& fileItem)
+		: m_stream(*m_queue, static_cast<int64_t>(fileItem.size))
 	{
 		m_stream.open(QIODevice::ReadOnly);
-		QStdOStream stream(m_queue);
-		zip.extractTo(stream, fileItem.index);
-		m_queue.Close();
+		ctx.Extract(fileItem.index, m_queue);
 	}
 
 private: // Stream
@@ -270,15 +270,15 @@ private: // Stream
 	}
 
 private:
-	PacketQueue     m_queue;
-	QIODeviceStream m_stream;
+	std::shared_ptr<PacketQueue> m_queue { std::make_shared<PacketQueue>() };
+	QIODeviceStream              m_stream;
 };
 
 class FileReader final : public IFile
 {
 public:
-	FileReader(const bit7z::BitInputArchive& zip, const FileItem& fileItem)
-		: m_zip { zip }
+	FileReader(Context& ctx, const FileItem& fileItem)
+		: m_ctx { ctx }
 		, m_fileItem { fileItem }
 	{
 	}
@@ -288,7 +288,7 @@ private: // IFile
 	{
 		try
 		{
-			return std::make_unique<StreamImpl>(m_zip, m_fileItem);
+			return std::make_unique<StreamImpl>(m_ctx, m_fileItem);
 		}
 		catch (const std::exception& ex)
 		{
@@ -308,17 +308,53 @@ private: // IFile
 	}
 
 private:
-	const bit7z::BitInputArchive& m_zip;
-	const FileItem&               m_fileItem;
+	Context&        m_ctx;
+	const FileItem& m_fileItem;
 };
 
 } // namespace
 
+struct Context::Impl
+{
+	const bit7z::BitInputArchive& zip;
+	Util::ThreadPool<>            pool { { .threadCount = 1 } };
+
+	explicit Impl(const bit7z::BitInputArchive& zip)
+		: zip { zip }
+	{
+	}
+
+	void Extract(const uint32_t index, std::weak_ptr<PacketQueue> queue)
+	{
+		pool.enqueue([this, index, queue = std::move(queue)](size_t&, const std::stop_token&) {
+			QStdOStream stream(queue);
+			zip.extractTo(stream, index);
+			if (const auto locked = queue.lock())
+				locked->Close();
+		});
+	}
+};
+
+Context::Context(const bit7z::BitInputArchive& zip)
+	: m_impl { zip }
+{
+}
+
+Context::~Context()
+{
+	m_impl->pool.wait();
+}
+
+void Context::Extract(const uint32_t index, std::weak_ptr<PacketQueue> queue)
+{
+	m_impl->Extract(index, std::move(queue));
+}
+
 namespace File {
 
-std::unique_ptr<IFile> Read(const bit7z::BitInputArchive& zip, const FileItem& fileItem)
+std::unique_ptr<IFile> Read(Context& ctx, const FileItem& fileItem)
 {
-	return std::make_unique<FileReader>(zip, fileItem);
+	return std::make_unique<FileReader>(ctx, fileItem);
 }
 
 } // namespace File
