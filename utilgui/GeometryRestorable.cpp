@@ -27,7 +27,7 @@ constexpr auto SPLITTER_KEY_TEMPLATE = "ui/%1/%2";
 
 void InitSplitter(QSplitter* splitter)
 {
-	QTimer::singleShot(0, splitter, [=] {
+	QTimer::singleShot(0, splitter, [splitter] {
 		QList<int> sizes = splitter->sizes();
 		const auto width = std::accumulate(sizes.cbegin(), sizes.cend(), 0);
 
