@@ -4,6 +4,8 @@
 #include <mutex>
 #include <thread>
 
+#include <QCoreApplication>
+
 #include "fnd/NonCopyMovable.h"
 
 #include "executor/factory.h"
@@ -59,7 +61,10 @@ public:
 	~Executor() override
 	{
 		Stop();
-		m_forwarder->deleteLater();
+		// While QCoreApplication is being destroyed, deleteLater() (like any QObject deletion) deadlocks on the event-queue
+		// lock Qt already holds; the process is exiting then, so the forwarder is left to it
+		if (QCoreApplication::instance() && !QCoreApplication::closingDown())
+			m_forwarder->deleteLater();
 	}
 
 private: // Util::IExecutor
