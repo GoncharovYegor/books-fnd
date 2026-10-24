@@ -4,8 +4,6 @@
 #include <mutex>
 #include <thread>
 
-#include <QTimer>
-
 #include "fnd/NonCopyMovable.h"
 
 #include "executor/factory.h"
@@ -61,9 +59,7 @@ public:
 	~Executor() override
 	{
 		Stop();
-		QTimer::singleShot(0, [forwarder = m_forwarder] {
-			delete forwarder;
-		});
+		m_forwarder->deleteLater();
 	}
 
 private: // Util::IExecutor
