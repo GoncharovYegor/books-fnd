@@ -248,7 +248,7 @@ private: // IZip
 			m_progress->OnSetCompleted(static_cast<int64_t>(progress));
 			return !m_progress->OnCheckBreak();
 		});
-		return File::Read(*m_archive, m_files.GetFile(filename));
+		return File::Read(*m_ctx, m_files.GetFile(filename));
 	}
 
 	std::unordered_map<QString, QByteArray> ReadAll() const override
@@ -292,6 +292,7 @@ private: // IZip
 
 protected:
 	std::unique_ptr<bit7z::BitArchiveReader> m_archive;
+	std::unique_ptr<Context>                 m_ctx;
 };
 
 class ReaderFile : public Reader
@@ -302,6 +303,7 @@ public:
 		, m_stream { CreateStream(filename) }
 	{
 		m_archive = std::make_unique<bit7z::BitArchiveReader>(m_lib, m_stream);
+		m_ctx     = std::make_unique<Context>(*m_archive);
 		m_files   = CreateFileList(*m_archive);
 	}
 
