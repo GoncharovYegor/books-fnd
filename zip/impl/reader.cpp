@@ -326,9 +326,17 @@ struct Context::Impl
 
 	void Extract(const uint32_t index, std::weak_ptr<PacketQueue> queue)
 	{
+		assert(!queue.expired());
 		pool.enqueue([this, index, queue = std::move(queue)](size_t&, const std::stop_token&) {
 			QStdOStream stream(queue);
-			zip.extractTo(stream, index);
+			try
+			{
+				zip.extractTo(stream, index);
+			}
+			catch (const std::exception& ex)
+			{
+				PLOGI << "extract failed: " << ex.what();
+			}
 			if (const auto locked = queue.lock())
 				locked->Close();
 		});
