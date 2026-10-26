@@ -225,42 +225,37 @@ protected:
 
 class Reader : public ZipImpl
 {
-	NON_COPY_MOVABLE(Reader)
-
 protected:
 	explicit Reader(std::shared_ptr<ProgressCallback> progress)
 		: ZipImpl(std::move(progress))
 	{
 	}
 
-	~Reader() override
+	void SetCallbacks() const
 	{
-		m_progress->OnDone();
+		m_archive->setTotalCallback([this](const int64_t value) {
+			m_progress->OnStartWithTotal(value);
+		});
+
+		m_archive->setProgressCallback([this, total = int64_t { 0 }](const int64_t value) mutable {
+			m_progress->OnIncrement(value - total);
+			total = value;
+			return !m_progress->OnCheckBreak();
+		});
+
+		m_archive->setFileCallback([this](const auto& file) {
+			m_progress->OnFileDone(QString::fromBit7zString(file));
+		});
 	}
 
 private: // IZip
 	std::unique_ptr<IFile> Read(const QString& filename) const override
 	{
-		m_archive->setTotalCallback([this](const uint64_t total) {
-			m_progress->OnStartWithTotal(static_cast<int64_t>(total));
-		});
-		m_archive->setProgressCallback([this](const uint64_t progress) {
-			m_progress->OnSetCompleted(static_cast<int64_t>(progress));
-			return !m_progress->OnCheckBreak();
-		});
 		return File::Read(*m_ctx, m_files.GetFile(filename));
 	}
 
 	std::unordered_map<QString, QByteArray> ReadAll() const override
 	{
-		m_archive->setTotalCallback([this](const uint64_t total) {
-			m_progress->OnStartWithTotal(static_cast<int64_t>(total));
-		});
-		m_archive->setProgressCallback([this](const uint64_t progress) {
-			m_progress->OnSetCompleted(static_cast<int64_t>(progress));
-			return !m_progress->OnCheckBreak();
-		});
-
 #ifdef ADDITIONAL_LOG_ENABLED
 		PLOGV << "extracting...";
 #endif
@@ -305,6 +300,7 @@ public:
 		m_archive = std::make_unique<bit7z::BitArchiveReader>(m_lib, m_stream);
 		m_ctx     = std::make_unique<Context>(*m_archive);
 		m_files   = CreateFileList(*m_archive);
+		SetCallbacks();
 	}
 
 private:
@@ -333,6 +329,7 @@ public:
 		}
 		m_archive = std::make_unique<bit7z::BitArchiveReader>(m_lib, m_bytes);
 		m_files   = CreateFileList(*m_archive);
+		SetCallbacks();
 	}
 
 protected:
