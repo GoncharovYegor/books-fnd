@@ -61,8 +61,6 @@ public:
 	~Executor() override
 	{
 		Stop();
-		// While QCoreApplication is being destroyed, deleteLater() (like any QObject deletion) deadlocks on the event-queue
-		// lock Qt already holds; the process is exiting then, so the forwarder is left to it
 		if (QCoreApplication::instance() && !QCoreApplication::closingDown())
 			m_forwarder->deleteLater();
 	}
