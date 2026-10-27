@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "fnd/NonCopyMovable.h"
 #include "fnd/memory.h"

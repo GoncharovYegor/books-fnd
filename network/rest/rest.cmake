@@ -1,4 +1,4 @@
-﻿include_directories(${CMAKE_CURRENT_LIST_DIR}/github_api/include)
+include_directories(${CMAKE_CURRENT_LIST_DIR}/github_api/include)
 
 AddTarget(rest	shared_lib
 	SOURCE_DIRECTORY
