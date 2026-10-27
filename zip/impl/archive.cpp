@@ -328,6 +328,7 @@ public:
 			stream.read(reinterpret_cast<char*>(m_bytes.data()), static_cast<qint64>(m_bytes.size()));
 		}
 		m_archive = std::make_unique<bit7z::BitArchiveReader>(m_lib, m_bytes);
+		m_ctx     = std::make_unique<Context>(*m_archive);
 		m_files   = CreateFileList(*m_archive);
 		SetCallbacks();
 	}
