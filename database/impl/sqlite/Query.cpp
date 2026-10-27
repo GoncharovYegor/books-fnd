@@ -56,11 +56,13 @@ private: // Query
 
 	std::string ColumnName(const size_t index) const override
 	{
+		assert(index < ColumnCount() && "the query has no such column");
 		return m_query.column_name(Index(index));
 	}
 
 	bool IsNull(const size_t index) const override
 	{
+		assert(index < ColumnCount() && "the query has no such column");
 		return (*m_it).column_type(Index(index)) == SQLITE_NULL;
 	}
 
@@ -149,6 +151,8 @@ private:
 	template <typename T>
 	T Get(const size_t index) const
 	{
+		// sqlite returns NULL, 0 or an empty value for a column the result does not have, which hides a wrong query
+		assert(index < ColumnCount() && "the query has no such column");
 		return (*m_it).get<T>(Index(index));
 	}
 
