@@ -384,6 +384,8 @@ inline constexpr const char* GENRES[] {
 	QT_TRANSLATE_NOOP("Genre", "dorama"),
 	QT_TRANSLATE_NOOP("Genre", "fantasy_det"),
 	QT_TRANSLATE_NOOP("Genre", "foreign_sf"),
+	QT_TRANSLATE_NOOP("Genre", "llm_art"),
+	QT_TRANSLATE_NOOP("Genre", "child_psychology"),
 };
 
 class UTIL_EXPORT GenreFixerInitializer
