@@ -30,9 +30,10 @@ public:
 private: // Util::IExecutor
 	size_t operator()(Task&& task, int /*priority*/, bool) override
 	{
+		ThreadContext ctx;
 		m_initializer.beforeExecute();
 		PLOGD << task.name << " started";
-		const auto taskResult = task.task();
+		const auto taskResult = task.task(ctx);
 		PLOGD << task.name << " finished";
 		taskResult(task.id);
 		m_initializer.afterExecute();

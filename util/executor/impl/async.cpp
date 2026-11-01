@@ -92,6 +92,7 @@ private: // Util::IExecutor
 private:
 	void Work(const std::stop_token stop) override
 	{
+		ThreadContext ctx;
 		while (!stop.stop_requested())
 		{
 			auto taskOpt = [&]() -> std::optional<Task> {
@@ -117,7 +118,7 @@ private:
 			try
 			{
 				PLOGD << name << " started";
-				auto taskResult = task();
+				auto taskResult = task(ctx);
 				PLOGD << name << " finished";
 
 				m_forwarder->Forward([id, taskResult = std::move(taskResult)] {

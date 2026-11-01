@@ -2,7 +2,9 @@
 
 #include <atomic>
 #include <functional>
+#include <memory>
 #include <string>
+#include <vector>
 
 #include "export/util.h"
 
@@ -13,12 +15,37 @@ class UTIL_EXPORT IExecutor
 	static std::atomic<size_t> s_id;
 
 public:
+	class IThreadHandled // NOLINT(cppcoreguidelines-special-member-functions)
+	{
+	public:
+		virtual ~IThreadHandled() = default;
+		using Ptr         = std::unique_ptr<IThreadHandled>;
+	};
+
+	class ThreadContext
+	{
+	public:
+		~ThreadContext()
+		{
+			m_threadHandled.clear();
+		}
+	public:
+		void Add(IThreadHandled::Ptr threadHandled)
+		{
+			m_threadHandled.emplace_back(std::move(threadHandled));
+		}
+
+	private:
+		std::vector<IThreadHandled::Ptr> m_threadHandled;
+	};
+
+public:
 	using TaskResult = std::function<void(size_t)>;
 
 	struct Task
 	{
-		std::string                 name;
-		std::function<TaskResult()> task { [] {
+		std::string                               name;
+		std::function<TaskResult(ThreadContext&)> task { [](ThreadContext&) {
 			return [](size_t) {
 			};
 		} };
