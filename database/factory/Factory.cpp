@@ -10,42 +10,52 @@ namespace HomeCompa::DB::Factory {
 
 namespace {
 
-using FactoryCreator         = std::unique_ptr<IDatabase> (*)(const std::string& connection);
-using FactoryCreatorWritable = std::unique_ptr<IDatabaseWritable> (*)(const std::string& connection);
-constexpr std::pair<FactoryCreator, FactoryCreatorWritable> g_creators[] {
+template <typename T>
+using FactoryCreator = std::unique_ptr<T> (*)(const std::string& connection);
+
+constexpr std::pair<FactoryCreator<IDatabase>, FactoryCreator<IDatabaseWritable>> DATABASE_CREATIRS[] {
 	{
-	 &DB::Impl::Sqlite::CreateDatabase,
-	 &DB::Impl::Sqlite::CreateDatabaseWritable,
+	 &DB::Impl::Sqlite::Create<IDatabase>,
+	 &DB::Impl::Sqlite::Create<IDatabaseWritable>,
 	 },
 };
 
 size_t ToIndex(const Impl impl)
 {
 	const auto index = static_cast<size_t>(impl);
-	assert(index < std::size(g_creators));
+	assert(index < std::size(DATABASE_CREATIRS));
 	return index;
 }
 
-auto GetCreator(const Impl impl)
+template <typename T>
+FactoryCreator<T> GetCreator(const Impl impl)
 {
-	return g_creators[ToIndex(impl)];
+	return DATABASE_CREATIRS[ToIndex(impl)];
+}
+
+template <>
+FactoryCreator<IDatabase> GetCreator(const Impl impl)
+{
+	return DATABASE_CREATIRS[ToIndex(impl)].first;
+}
+
+template <>
+FactoryCreator<IDatabaseWritable> GetCreator(const Impl impl)
+{
+	return DATABASE_CREATIRS[ToIndex(impl)].second;
 }
 
 } // namespace
 
-
-std::unique_ptr<IDatabase> Create(const Impl impl, const std::string& connection)
+template <Details::ExportedDatabaseType T>
+std::unique_ptr<T> Create(const Impl impl, const std::string& connection)
 {
-	const auto creator = GetCreator(impl).first;
+	const auto creator = GetCreator<T>(impl);
 	assert(creator);
 	return creator(connection);
 }
 
-std::unique_ptr<IDatabaseWritable> CreateWritable(const Impl impl, const std::string& connection)
-{
-	const auto creator = GetCreator(impl).second;
-	assert(creator);
-	return creator(connection);
-}
+template DBFACTORY_EXPORT std::unique_ptr<IDatabase> Create(Impl impl, const std::string& connection);
+template DBFACTORY_EXPORT std::unique_ptr<IDatabaseWritable> Create(Impl impl, const std::string& connection);
 
 } // namespace HomeCompa::DB::Factory

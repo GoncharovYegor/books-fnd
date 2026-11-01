@@ -63,14 +63,21 @@ ConnectionParameters ParseConnectionString(const std::string& connection)
 	return result;
 }
 
-int GetOpenFlags(const std::string& db, const bool readOnly)
+template <Details::ExportedDatabaseType T>
+consteval int GetReadWriteFlag() noexcept
 {
-	int result = readOnly ? SQLITE_OPEN_READONLY : SQLITE_OPEN_READWRITE;
+	if constexpr (std::same_as<T, IDatabaseWritable>)
+		return SQLITE_OPEN_READWRITE;
+	else
+		return SQLITE_OPEN_READONLY;
+}
 
-	if (!readOnly && !exists(std::filesystem::path(db)))
-		result |= SQLITE_OPEN_CREATE;
+int GetOpenFlags(const std::string& db, int flag)
+{
+	if ((flag & SQLITE_OPEN_READWRITE) && !exists(std::filesystem::path(db)))
+		flag |= SQLITE_OPEN_CREATE;
 
-	return result | SQLITE_OPEN_URI;
+	return flag | SQLITE_OPEN_URI;
 }
 
 const std::string& GetValue(const ConnectionParameters& parameters, const std::string& key)
@@ -82,7 +89,7 @@ const std::string& GetValue(const ConnectionParameters& parameters, const std::s
 	return begin->second;
 }
 
-class DatabaseFunctionContext : public DB::DatabaseFunctionContext
+class DatabaseFunctionContext final : public DB::DatabaseFunctionContext
 {
 public:
 	explicit DatabaseFunctionContext(sqlite3pp::ext::context& ctx)
@@ -124,9 +131,9 @@ private:
 	};
 
 public:
-	explicit Database(const std::string& connection, const bool readOnly = false)
+	Database(const std::string& connection, const int flag)
 		: m_connectionParameters(ParseConnectionString(connection))
-		, m_db(GetValue(m_connectionParameters, PATH).data(), GetOpenFlags(GetValue(m_connectionParameters, PATH), readOnly))
+		, m_db(GetValue(m_connectionParameters, PATH).data(), GetOpenFlags(GetValue(m_connectionParameters, PATH), flag))
 		, m_observer(*this)
 	{
 		for (auto [begin, end] = m_connectionParameters.equal_range(EXTENSION); begin != end; ++begin)
@@ -144,6 +151,7 @@ public:
 
 	~Database() override
 	{
+		m_db.disconnect();
 		PLOGV << "database connection closed";
 	}
 
@@ -190,14 +198,13 @@ private:
 
 } // namespace
 
-std::unique_ptr<IDatabase> CreateDatabase(const std::string& connection)
+template <Details::ExportedDatabaseType T>
+std::unique_ptr<T> Create(const std::string& connection)
 {
-	return std::make_unique<Database>(connection, true);
+	return std::make_unique<Database>(connection, GetReadWriteFlag<T>());
 }
 
-std::unique_ptr<IDatabaseWritable> CreateDatabaseWritable(const std::string& connection)
-{
-	return std::make_unique<Database>(connection);
-}
+template DBSQLITE_EXPORT std::unique_ptr<IDatabase> Create(const std::string& connection);
+template DBSQLITE_EXPORT std::unique_ptr<IDatabaseWritable> Create(const std::string& connection);
 
 } // namespace HomeCompa::DB::Impl::Sqlite

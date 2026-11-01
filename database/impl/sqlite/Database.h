@@ -16,8 +16,21 @@ class IDatabaseWritable;
 
 namespace HomeCompa::DB::Impl::Sqlite {
 
-DBSQLITE_EXPORT std::unique_ptr<IDatabase> CreateDatabase(const std::string& connection);
-DBSQLITE_EXPORT std::unique_ptr<IDatabaseWritable> CreateDatabaseWritable(const std::string& connection);
+namespace Details {
+
+template <typename T, typename... AllowedTypes>
+concept IsOneOf = (... || std::same_as<T, AllowedTypes>);
+
+template <typename T>
+concept ExportedDatabaseType = IsOneOf<T, IDatabase, IDatabaseWritable>;
+
+}
+
+template <Details::ExportedDatabaseType T>
+DBSQLITE_EXPORT std::unique_ptr<T> Create(const std::string& connection);
+
+extern template DBSQLITE_EXPORT std::unique_ptr<IDatabase> Create(const std::string& connection);
+extern template DBSQLITE_EXPORT std::unique_ptr<IDatabaseWritable> Create(const std::string& connection);
 
 inline std::string_view LogStatement(const std::string_view statement)
 {

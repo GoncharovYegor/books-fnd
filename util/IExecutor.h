@@ -19,7 +19,7 @@ public:
 	{
 	public:
 		virtual ~IThreadHandled() = default;
-		using Ptr         = std::unique_ptr<IThreadHandled>;
+		using Ptr                 = std::unique_ptr<IThreadHandled>;
 	};
 
 	class ThreadContext
@@ -29,6 +29,7 @@ public:
 		{
 			m_threadHandled.clear();
 		}
+
 	public:
 		void Add(IThreadHandled::Ptr threadHandled)
 		{
