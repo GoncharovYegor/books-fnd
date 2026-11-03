@@ -1,7 +1,7 @@
 #include "reader.h"
 
 #include <condition_variable>
-#include <queue>
+#include <deque>
 
 #include <QBuffer>
 
@@ -23,6 +23,8 @@ struct BytePacket
 {
 	std::unique_ptr<char[]> storage;
 	size_t                  length { 0 };
+
+	using Ptr = const BytePacket*;
 };
 
 class PacketQueue
@@ -42,23 +44,34 @@ public:
 		std::lock_guard lock(m_queueGuard);
 		assert(!m_isClosed && packet.length != 0 && !!packet.storage);
 
-		m_queue.push(std::move(packet));
+		m_queue.push_back(std::move(packet));
 		m_condition.notify_one();
 	}
 
-	std::optional<BytePacket> Pop()
+	BytePacket::Ptr Pop()
 	{
 		std::unique_lock lock(m_queueGuard);
-		m_condition.wait(lock, [this]() {
-			return !m_queue.empty() || m_isClosed;
+		m_condition.wait(lock, [this] {
+			return m_queue.size() > m_position || m_isClosed;
 		});
 
-		if (m_queue.empty() && m_isClosed)
-			return std::nullopt;
+		if (m_queue.size() <= m_position && m_isClosed)
+			return nullptr;
 
-		auto result = std::move(m_queue.front());
-		m_queue.pop();
-		return result;
+		return &m_queue[m_position++];
+	}
+
+	ptrdiff_t Seek(ptrdiff_t offset)
+	{
+		size_t position = 0;
+		for (const auto sz = m_queue.size(); position < sz && offset >= static_cast<ptrdiff_t>(m_queue[position].length); ++position)
+			offset -= static_cast<ptrdiff_t>(m_queue[position].length);
+
+		if (position == m_queue.size() && offset != 0)
+			return -1;
+
+		m_position = position;
+		return offset;
 	}
 
 	void Close()
@@ -70,7 +83,8 @@ public:
 
 private:
 	std::condition_variable m_condition;
-	std::queue<BytePacket>  m_queue;
+	size_t                  m_position { 0 };
+	std::deque<BytePacket>  m_queue;
 	std::mutex              m_queueGuard;
 	bool                    m_isClosed { false };
 };
@@ -108,7 +122,7 @@ private: // QIODevice
 			}
 			else
 			{
-				m_packet         = {};
+				m_packet         = nullptr;
 				m_packetPosition = 0;
 			}
 
@@ -137,7 +151,11 @@ private: // QIODevice
 
 	bool seek([[maybe_unused]] const qint64 pos) override
 	{
-		assert(pos == m_position);
+		const auto seekResult = m_queue.Seek(pos);
+		if (seekResult < 0)
+			return false;
+
+		m_position = seekResult;
 		return true;
 	}
 
@@ -146,8 +164,8 @@ private:
 	const qint64 m_size;
 	qint64       m_position { 0 };
 
-	std::optional<BytePacket> m_packet;
-	qint64                    m_packetPosition { 0 };
+	BytePacket::Ptr m_packet { nullptr };
+	qint64          m_packetPosition { 0 };
 };
 
 class QStdOStream final : public std::ostream
