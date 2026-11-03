@@ -9,6 +9,7 @@
 
 #include "fnd/EnumBitmask.h"
 #include "fnd/IsOneOf.h"
+#include "fnd/algorithm.h"
 #include "fnd/try.h"
 
 #include "settings/ISettings.h"
@@ -46,7 +47,7 @@ ENABLE_BITMASK_OPERATORS(ImageProcessing);
 
 namespace {
 
-using Covers = std::unordered_map<QString, std::pair<bool, QByteArray>>;
+using Covers = std::unordered_map<QString, std::pair<bool, QByteArray>, QStringViewHash, QStringViewEqual>;
 
 constexpr auto BINARY       = u"binary";
 constexpr auto ID           = u"id";
@@ -165,6 +166,8 @@ class SaxPrinter final : public SaxParser
 	static constexpr auto AUTHOR_MIDDLE_NAME = u"middle-name";
 	static constexpr auto BOOK_TITLE         = u"FictionBook/description/title-info/book-title";
 	static constexpr auto SEQUENCE           = u"FictionBook/description/title-info/sequence";
+	static constexpr auto IMAGE              = u"image";
+	static constexpr auto HREF               = u":href";
 
 public:
 	SaxPrinter(QIODevice& input, QIODevice& output, Covers covers, std::unique_ptr<const ExtractedBook> metadataReplacement, const ImageProcessing imageProcessing, QString encoding)
@@ -205,7 +208,34 @@ private: // Util::SaxParser
 		if (name == BINARY && !m_covers.empty())
 			return WriteImage(attributes.GetAttribute(ID)), true;
 
-		m_writer->WriteStartElement(name, attributes);
+		if (name != IMAGE)
+		{
+			m_writer->WriteStartElement(name, attributes);
+		}
+		else
+		{
+			m_writer->WriteStartElement(name);
+			for (size_t i = 0, sz = attributes.GetCount(); i < sz; ++i)
+			{
+				const auto attrName = attributes.GetName(i), attrValue = attributes.GetValue(i);
+				const auto fixedImageAttrValue = [&]() -> QStringView {
+					if (attrValue.length() < 2 || attrValue[0] != '#' || attrValue[1].category() != QChar::Category::Number_DecimalDigit)
+						return {};
+
+					const auto id = QStringView(std::next(attrValue.begin(), 1), attrValue.end());
+					return m_covers.contains(id) ? id : QStringView {};
+				};
+
+				if (attributes.GetName(i).endsWith(HREF))
+					if (const auto fixedImageId = fixedImageAttrValue(); !fixedImageId.isEmpty())
+					{
+						m_writer->WriteAttribute(attrName, QString("#_%1").arg(fixedImageId));
+						continue;
+					}
+
+				m_writer->WriteAttribute(attrName, attrValue);
+			}
+		}
 
 		if (path == TITLE_INFO && m_metadataReplacement)
 			for (const auto invoker : {
@@ -282,7 +312,7 @@ private: // Util::SaxParser
 	}
 
 private:
-	void WriteAuthor()
+	void WriteAuthor() const
 	{
 		assert(m_metadataReplacement);
 		const auto node = m_writer->Guard(u"author");
@@ -291,13 +321,13 @@ private:
 		node->WriteStartElement(AUTHOR_LAST_NAME).WriteCharacters(m_metadataReplacement->authorFull.lastName).WriteEndElement();
 	}
 
-	void WriteTitle()
+	void WriteTitle() const
 	{
 		assert(m_metadataReplacement);
 		m_writer->WriteStartElement(u"book-title").WriteCharacters(m_metadataReplacement->title).WriteEndElement();
 	}
 
-	void WriteSeries()
+	void WriteSeries() const
 	{
 		assert(m_metadataReplacement);
 		if (m_metadataReplacement->series.isEmpty())
@@ -350,10 +380,14 @@ private:
 		m_covers.clear();
 	}
 
-	void WriteImage(const QStringView name, const bool isCover, const QByteArray& body)
+	void WriteImage(const QStringView name, const bool isCover, const QByteArray& body) const
 	{
 		if (const auto [bytes, mediaType] = RecodeImage(isCover, m_imageProcessing, body); !bytes.isEmpty())
-			m_writer->WriteStartElement(BINARY).WriteAttribute(ID, name).WriteAttribute(CONTENT_TYPE, QString(mediaType)).WriteCharacters(QString::fromUtf8(bytes.toBase64())).WriteEndElement();
+			m_writer->WriteStartElement(BINARY)
+				.WriteAttribute(ID, name[0].category() == QChar::Category::Number_DecimalDigit ? QString("_%1").arg(name) : name)
+				.WriteAttribute(CONTENT_TYPE, QString(mediaType))
+				.WriteCharacters(QString::fromUtf8(bytes.toBase64()))
+				.WriteEndElement();
 	}
 
 private:

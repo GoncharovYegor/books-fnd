@@ -5,6 +5,7 @@
 #include <vector>
 
 #include <QDataStream>
+#include <QHash>
 #include <QIODevice>
 #include <QString>
 #include <QVariant>
@@ -243,6 +244,46 @@ struct VariantHash
 		}
 
 		return qHash(bytes);
+	}
+};
+
+struct QStringViewHash
+{
+	using is_transparent = void;
+
+	size_t operator()(const QStringView bv) const noexcept
+	{
+		return qHash(bv);
+	}
+
+	size_t operator()(const QString& str) const noexcept
+	{
+		return qHash(str);
+	}
+};
+
+struct QStringViewEqual
+{
+	using is_transparent = void;
+
+	bool operator()(const QStringView lhs, const QStringView rhs) const noexcept
+	{
+		return lhs == rhs;
+	}
+
+	bool operator()(const QString& lhs, const QString& rhs) const noexcept
+	{
+		return lhs == rhs;
+	}
+
+	bool operator()(const QString& lhs, const QStringView rhs) const noexcept
+	{
+		return lhs == rhs;
+	}
+
+	bool operator()(const QStringView lhs, const QString& rhs) const noexcept
+	{
+		return lhs == rhs;
 	}
 };
 
