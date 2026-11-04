@@ -44,6 +44,8 @@ protected:
 protected:
 	void LoadGeometry();
 	void SaveGeometry();
+	void LoadLayout();
+	void SaveLayout();
 	void SetFixedFont(QWidget* widget, FontComponent fontComponent);
 
 private:

@@ -1,6 +1,8 @@
 #include "GeometryRestorable.h"
 
 #include <QGuiApplication>
+#include <QLayout>
+#include <QMetaEnum>
 #include <QScreen>
 #include <QSplitter>
 #include <QTimer>
@@ -24,6 +26,12 @@ namespace {
 constexpr auto STATE_KEY_TEMPLATE    = "ui/%1/State";
 constexpr auto GEOMETRY_KEY_TEMPLATE = "ui/%1/Geometry";
 constexpr auto SPLITTER_KEY_TEMPLATE = "ui/%1/%2";
+
+constexpr auto LAYOUT               = "Layout";
+constexpr auto FRAME_LINE_WIDTH     = "lineWidth";
+constexpr auto FRAME_MID_LINE_WIDTH = "midLineWidth";
+constexpr auto FRAME_SHAPE          = "frameShape";
+constexpr auto FRAME_SHADOW         = "frameShadow";
 
 void InitSplitter(QSplitter* splitter)
 {
@@ -59,6 +67,11 @@ void SetGeometry(QWidget& widget, QRect rect)
 		rect.moveCenter(QGuiApplication::primaryScreen()->availableGeometry().center());
 
 	Platform::SetGeometry(widget, rect);
+}
+
+QString GetSerializeProcessKey(const QString& name, const QString& key)
+{
+	return QString("UiCustomization%1/%2").arg(name).arg(key);
 }
 
 } // namespace
@@ -105,6 +118,17 @@ public:
 				InitSplitter(splitter);
 			splitter->setChildrenCollapsible(false);
 		}
+	}
+
+	void LoadLayout()
+	{
+		SerializationProcess(m_observer.GetWidget(), {}, &Impl::DeserializeWidget);
+	}
+
+	void SaveLayout()
+	{
+		m_settings->Remove("UiCustomization");
+		SerializationProcess(m_observer.GetWidget(), {}, &Impl::SerializeWidget);
 	}
 
 	void OnHide()
@@ -202,6 +226,123 @@ private:
 		return m_widgets;
 	}
 
+	void SerializationProcess(QWidget& widget, const QString& objectName, void (Impl::*f)(QWidget&, const QString&))
+	{
+		auto parentName = objectName;
+		if (const auto widgetObjectName = widget.objectName(); !widgetObjectName.isEmpty())
+		{
+			parentName.append("/").append(widgetObjectName);
+			std::invoke(f, this, widget, parentName);
+		}
+		for (auto* child : widget.findChildren<QWidget*>(QString {}, Qt::FindDirectChildrenOnly))
+			SerializationProcess(*child, parentName, f);
+	}
+
+	void SerializeWidget(QWidget& widget, const QString& name)
+	{
+		if (const auto* layout = widget.layout())
+			SerializeLayout(*layout, name);
+
+		if (const auto* frame = qobject_cast<const QFrame*>(&widget))
+			SerializeFrame(*frame, name);
+	}
+
+	void SerializeLayout(const QLayout& layout, const QString& name)
+	{
+		const auto m = layout.contentsMargins();
+		m_settings->Set(GetSerializeProcessKey(name, LAYOUT), QString("%1,%2,%3,%4,%5").arg(m.left()).arg(m.right()).arg(m.top()).arg(m.bottom()).arg(layout.spacing()));
+	}
+
+	void SerializeFrame(const QFrame& frame, const QString& name)
+	{
+		m_settings->Set(GetSerializeProcessKey(name, FRAME_LINE_WIDTH), frame.lineWidth());
+		m_settings->Set(GetSerializeProcessKey(name, FRAME_MID_LINE_WIDTH), frame.midLineWidth());
+		m_settings->Set(GetSerializeProcessKey(name, FRAME_SHAPE), QMetaEnum::fromType<QFrame::Shape>().valueToKey(frame.frameShape()));
+		m_settings->Set(GetSerializeProcessKey(name, FRAME_SHADOW), QMetaEnum::fromType<QFrame::Shadow>().valueToKey(frame.frameShadow()));
+	}
+
+	void DeserializeWidget(QWidget& widget, const QString& name)
+	{
+		if (auto* layout = widget.layout())
+			DeserializeLayout(*layout, name);
+
+		if (auto* frame = qobject_cast<QFrame*>(&widget))
+			DeserializeFrame(*frame, name);
+	}
+
+	void DeserializeLayout(QLayout& layout, const QString& name)
+	{
+		const auto layoutVar = m_settings->Get(GetSerializeProcessKey(name, LAYOUT));
+		if (!layoutVar.isValid())
+			return;
+
+		const auto values = layoutVar.toString().split(',', Qt::KeepEmptyParts);
+
+		const auto toInt = [&](const int n) -> std::optional<int> {
+			if (n >= values.size())
+				return std::nullopt;
+			bool ok = false;
+			if (const auto value = values[n].toInt(&ok); ok)
+				return value;
+			return std::nullopt;
+		};
+
+		auto m = layout.contentsMargins();
+
+		if (const auto value = toInt(0))
+			m.setLeft(*value);
+		if (const auto value = toInt(1))
+			m.setRight(*value);
+		if (const auto value = toInt(2))
+			m.setTop(*value);
+		if (const auto value = toInt(3))
+			m.setBottom(*value);
+		if (const auto value = toInt(4))
+			layout.setSpacing(*value);
+
+		layout.setContentsMargins(m);
+	}
+
+	void DeserializeFrame(QFrame& frame, const QString& name)
+	{
+		const auto getInt = [&](const char* key) -> std::optional<int> {
+			const auto var = m_settings->Get(GetSerializeProcessKey(name, key));
+			if (!var.isValid())
+				return std::nullopt;
+
+			bool ok = false;
+			if (const auto value = var.toInt(&ok); ok)
+				return value;
+
+			return std::nullopt;
+		};
+
+		auto getEnum = [&]<typename EnumType>(const char* key) -> std::optional<EnumType> {
+			const auto var = m_settings->Get(GetSerializeProcessKey(name, key));
+			if (!var.isValid())
+				return std::nullopt;
+
+			const QMetaEnum metaEnum = QMetaEnum::fromType<EnumType>();
+			if (!metaEnum.isValid())
+			{
+				assert(false && "unexpected type");
+				return std::nullopt;
+			}
+
+			const int value = metaEnum.keyToValue(var.toByteArray().constData());
+			return value >= -1 ? std::optional { static_cast<EnumType>(value) } : std::nullopt;
+		};
+
+		if (const auto value = getInt(FRAME_LINE_WIDTH))
+			frame.setLineWidth(*value);
+		if (const auto value = getInt(FRAME_MID_LINE_WIDTH))
+			frame.setMidLineWidth(*value);
+		if (const auto value = getEnum.operator()<QFrame::Shape>(FRAME_SHAPE))
+			frame.setFrameShape(*value);
+		if (const auto value = getEnum.operator()<QFrame::Shadow>(FRAME_SHADOW))
+			frame.setFrameShadow(*value);
+	}
+
 private:
 	IObserver&                                    m_observer;
 	PropagateConstPtr<ISettings, std::shared_ptr> m_settings;
@@ -230,6 +371,16 @@ void GeometryRestorable::LoadGeometry()
 void GeometryRestorable::SaveGeometry()
 {
 	m_impl->OnHide();
+}
+
+void GeometryRestorable::LoadLayout()
+{
+	m_impl->LoadLayout();
+}
+
+void GeometryRestorable::SaveLayout()
+{
+	m_impl->SaveLayout();
 }
 
 void GeometryRestorable::SetFixedFont(QWidget* widget, const FontComponent fontComponent)
