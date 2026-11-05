@@ -84,8 +84,9 @@ public:
 	}
 
 private:
-	virtual std::recursive_mutex& BeginGroup(const QString& group) const = 0;
-	virtual void                  EndGroup() const                       = 0;
+	// The lock stays held until EndGroup(): while it is released, another thread's group would nest in this one
+	virtual std::unique_lock<std::recursive_mutex> BeginGroup(const QString& group) const = 0;
+	virtual void                                   EndGroup() const                       = 0;
 	friend class SettingsGroup;
 };
 
@@ -106,8 +107,8 @@ public:
 	}
 
 private:
-	const ISettings&                      m_settings;
-	std::lock_guard<std::recursive_mutex> m_lock;
+	const ISettings&                       m_settings;
+	std::unique_lock<std::recursive_mutex> m_lock;
 };
 
 } // namespace HomeCompa

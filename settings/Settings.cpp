@@ -83,9 +83,9 @@ private: // ISettings
 	{
 	}
 
-	std::recursive_mutex& BeginGroup(const QString&) const override
+	std::unique_lock<std::recursive_mutex> BeginGroup(const QString&) const override
 	{
-		return m_mutex;
+		return std::unique_lock(m_mutex);
 	}
 
 	void EndGroup() const override
@@ -182,9 +182,9 @@ private: // ISettings
 		m_impl->Load(path);
 	}
 
-	std::recursive_mutex& BeginGroup(const QString&) const override
+	std::unique_lock<std::recursive_mutex> BeginGroup(const QString&) const override
 	{
-		return m_mutex;
+		return std::unique_lock(m_mutex);
 	}
 
 	void EndGroup() const override
@@ -298,12 +298,12 @@ private: // ISettings
 		Copy(*this, src);
 	}
 
-	std::recursive_mutex& BeginGroup(const QString& group) const override
+	std::unique_lock<std::recursive_mutex> BeginGroup(const QString& group) const override
 	{
-		std::lock_guard lock(m_mutex);
+		std::unique_lock lock(m_mutex);
 		m_settings.beginGroup(group);
 		m_group.push_back(Key(group));
-		return m_mutex;
+		return lock;
 	}
 
 	void EndGroup() const override
