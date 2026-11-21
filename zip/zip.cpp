@@ -270,7 +270,9 @@ Zip::Zip(QIODevice& stream, Format format, std::shared_ptr<ProgressCallback> pro
 {
 }
 
-Zip::~Zip() = default;
+Zip::~Zip()                = default;
+Zip::Zip(Zip&&)            = default;
+Zip& Zip::operator=(Zip&&) = default;
 
 void Zip::SetProperty(const PropertyId id, QVariant value)
 {

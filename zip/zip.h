@@ -61,10 +61,10 @@ public:
 	bool Remove(const std::vector<QString>& fileNames);
 
 public:
-	Zip(const Zip&)            = delete;
-	Zip(Zip&&)                 = default;
+	Zip(const Zip&) = delete;
+	Zip(Zip&&);
 	Zip& operator=(const Zip&) = delete;
-	Zip& operator=(Zip&&)      = default;
+	Zip& operator=(Zip&&);
 
 private:
 	class Impl;
