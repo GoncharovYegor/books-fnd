@@ -482,7 +482,7 @@ private: // IZip
 
 		PLOGI << m_filename << ", files removed: " << count;
 
-		return true;
+		return count != 0;
 	}
 
 private:

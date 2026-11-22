@@ -140,11 +140,12 @@ AddTarget(zip	shared_lib
 )
 
 AddGTest(zip
+    MOCK
 	PROJECT_GROUP UT/Foundation/Zip
 	SOURCE_DIRECTORY
 		"${CMAKE_CURRENT_LIST_DIR}/unit-tests"
-        LINK_LIBRARIES
+    LINK_LIBRARIES
 		Qt${QT_MAJOR_VERSION}::Core
-        LINK_TARGETS
+    LINK_TARGETS
 		zip
 )

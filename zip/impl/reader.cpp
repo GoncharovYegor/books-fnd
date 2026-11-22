@@ -155,7 +155,12 @@ private: // QIODevice
 		if (seekResult < 0)
 			return false;
 
-		m_position = seekResult;
+		m_packetPosition = seekResult;
+		m_packet         = {};
+		m_position       = pos;
+
+		QIODevice::seek(m_position);
+
 		return true;
 	}
 

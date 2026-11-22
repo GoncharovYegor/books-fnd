@@ -15,7 +15,6 @@ public:
 	virtual ~IZipFileProvider() = default;
 
 	virtual size_t                        GetCount() const noexcept                = 0;
-	virtual size_t                        GetFileSize(size_t index) const noexcept = 0;
 	virtual QString                       GetFileName(size_t index) const          = 0;
 	virtual QDateTime                     GetFileTime(size_t index) const          = 0;
 	virtual const std::vector<std::byte>& GetFileData(size_t index) const noexcept = 0;

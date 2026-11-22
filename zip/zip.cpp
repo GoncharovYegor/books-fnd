@@ -106,12 +106,6 @@ private: // IZipFileProvider
 		return m_items.size();
 	}
 
-	size_t GetFileSize(const size_t index) const noexcept override
-	{
-		assert(index < GetCount());
-		return m_items[index].body.size();
-	}
-
 	QString GetFileName(const size_t index) const override
 	{
 		assert(index < GetCount());
