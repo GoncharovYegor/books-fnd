@@ -21,7 +21,17 @@ AddTarget(dbsqlite	shared_lib
 
 
 AddGTest(dbsqlite
-	PROJECT_GROUP UT/Foundation/Database/Impl
+	MOCK
+	PROJECT_GROUP
+		UT/Foundation/Database/Impl
 	SOURCE_DIRECTORY
 		"${CMAKE_CURRENT_LIST_DIR}/unit-tests"
+	INCLUDE_DIRECTORIES
+		"${CMAKE_CURRENT_LIST_DIR}"
+		"${CMAKE_CURRENT_LIST_DIR}/../.."
+	LINK_LIBRARIES
+		plog::plog
+		Qt${QT_MAJOR_VERSION}::Core
+	LINK_TARGETS
+		dbsqlite
 )

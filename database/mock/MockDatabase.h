@@ -6,6 +6,14 @@
 
 namespace HomeCompa::DB::Test {
 
+class MockDatabaseObserver : public IDatabaseObserver
+{
+public: // IDatabaseObserver
+	MOCK_METHOD(void, OnInsert, (std::string_view dbName, std::string_view tableName, int64_t rowId), (override));
+	MOCK_METHOD(void, OnUpdate, (std::string_view dbName, std::string_view tableName, int64_t rowId), (override));
+	MOCK_METHOD(void, OnDelete, (std::string_view dbName, std::string_view tableName, int64_t rowId), (override));
+};
+
 class MockDatabase : public IDatabase
 {
 public: // IDatabase
@@ -27,6 +35,7 @@ public: // IDatabaseWritable
 	MOCK_METHOD(void, CreateFunction, (std::string_view name, DatabaseFunction function), (override));
 };
 
+static_assert(!std::is_abstract_v<MockDatabaseObserver>, "MockDatabaseObserver is abstract!");
 static_assert(!std::is_abstract_v<MockDatabase>, "MockDatabase is abstract!");
 static_assert(!std::is_abstract_v<MockDatabaseWritable>, "MockDatabaseWritable is abstract!");
 
