@@ -5,6 +5,7 @@
 #include <QBuffer>
 #include <QFile>
 #include <QTemporaryDir>
+#include <QVariant>
 
 #include <gtest/gtest.h>
 
