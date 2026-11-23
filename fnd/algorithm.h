@@ -134,6 +134,12 @@ inline QString ToQString<std::string>(const std::string& str)
 }
 
 template <>
+inline QString ToQString<std::string_view>(const std::string_view& str)
+{
+	return QString::fromStdString(std::string(str));
+}
+
+template <>
 inline QString ToQString<QString>(const QString& str)
 {
 	return str;
@@ -182,12 +188,51 @@ struct CaseInsensitiveComparer
 };
 
 template <>
+struct CaseInsensitiveComparer<QString>
+{
+	[[nodiscard]] constexpr bool operator()(const QString& lhs, const QString& rhs) const noexcept
+	{
+		return QString::compare(lhs, rhs, Qt::CaseInsensitive) < 0;
+	}
+};
+
+template <>
 struct CaseInsensitiveComparer<void>
 {
 	template <class L, class R>
-	[[nodiscard]] constexpr auto operator()(L&& lhs, R&& rhs) const noexcept(noexcept(static_cast<L&&>(lhs) < static_cast<R&&>(rhs))) -> decltype(static_cast<L&&>(lhs) < static_cast<R&&>(rhs))
+	[[nodiscard]] constexpr bool operator()(L&& lhs, R&& rhs) const noexcept(noexcept(ToQString(static_cast<L&&>(lhs)) < ToQString(static_cast<R&&>(rhs))))
 	{
 		return QString::compare(ToQString(static_cast<L&&>(lhs)), ToQString(static_cast<R&&>(rhs)), Qt::CaseInsensitive) < 0;
+	}
+
+	using is_transparent = int;
+};
+
+template <class T = void>
+struct CaseInsensitiveEqual
+{
+	[[nodiscard]] constexpr bool operator()(const T& lhs, const T& rhs) const noexcept(noexcept(FakeCopyInit<bool>(lhs < rhs)))
+	{
+		return QString::compare(ToQString(lhs), ToQString(rhs), Qt::CaseInsensitive) == 0;
+	}
+};
+
+template <>
+struct CaseInsensitiveEqual<QString>
+{
+	[[nodiscard]] constexpr bool operator()(const QString& lhs, const QString& rhs) const noexcept
+	{
+		return QString::compare(lhs, rhs, Qt::CaseInsensitive) == 0;
+	}
+};
+
+template <>
+struct CaseInsensitiveEqual<void>
+{
+	template <class L, class R>
+	[[nodiscard]] constexpr bool operator()(L&& lhs, R&& rhs) const noexcept(noexcept(ToQString(static_cast<L&&>(lhs)) < ToQString(static_cast<R&&>(rhs))))
+	{
+		return QString::compare(ToQString(static_cast<L&&>(lhs)), ToQString(static_cast<R&&>(rhs)), Qt::CaseInsensitive) == 0;
 	}
 
 	using is_transparent = int;
@@ -198,7 +243,8 @@ struct CaseInsensitiveHash
 {
 	size_t operator()(const T& value) const
 	{
-		return std::hash<QString>()(ToQString(value));
+		const auto result = std::hash<QString>()(ToQString(value).toLower());
+		return result;
 	}
 };
 

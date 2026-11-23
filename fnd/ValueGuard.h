@@ -2,10 +2,6 @@
 
 namespace HomeCompa {
 
-/// RAII-класс для временного выставления значения переменной. В деструкторе восстанавливает оригинальное значение.
-/// Использование:
-/// int var = 42;
-/// Core::ValueGuard<int> guard(var, newTemporaryValue);
 template <typename T>
 class ValueGuard
 {

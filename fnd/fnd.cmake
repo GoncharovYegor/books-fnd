@@ -9,7 +9,14 @@ AddTarget(fnd	shared_lib
 )
 
 AddGTest(fnd
-	PROJECT_GROUP UT/Foundation
+	MOCK
+	PROJECT_GROUP
+		UT/Foundation
 	SOURCE_DIRECTORY
 		"${CMAKE_CURRENT_LIST_DIR}/unit-tests"
+	LINK_LIBRARIES
+		Qt${QT_MAJOR_VERSION}::Core
+	LINK_TARGETS
+		fnd
+		logging
 )
